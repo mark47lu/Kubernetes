@@ -1,0 +1,198 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{xcolor}
+\usepackage{graphicx}  % 放在导言区（\documentclass 后）
+
+
+\title{\textbf{Kubernetes in Docker 1st}}
+\author{LU XINGCHEN}
+\date{20250518}
+
+
+\begin{document}
+
+\maketitle
+
+\section{Overall Architecture}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{example-image}  % 不加扩展名
+  \caption{This is a sample image}
+  \label{fig:sample}
+\end{figure}
+
+
+\hspace{2em}
+Nowadays, the rate of development of AI capabilities is likely to slow down relatively after the introduction of GPT-4, and the reason for this slowdown is related to the high dependence of the current technology path on computational resources (arithmetic).
+I searched for some data on the internet, 100000 H100 GPUs collection of equipment required 150MW of power. Although his peak arithmetic can reach 1.979x10e14 flop. But how to supply this equipment requires a great deal of power. Also it is impossible to put all of the 100000 GPUs in a single data center. So the need to establish multipul data centers.  And in this way it call solve the same problem that GPT-4 flop8 worked for within 4 days. Because of this problem that many companies change their old factories into data centers.
+
+\section{Problems}
+\subsection{Single Model Arithmetic}
+\hspace{2em}
+A single model means models like GPT-3 or GPT-4, which are trained by constant practice to adjust the parameters of the model and by adjusting the parameters to improve the model's ability.
+\\
+
+Today,GPT-4 is a strong enough model that can solve many problems that occurred near our lives.It seems that the capabilities of training the models have reached the top of capabilities of the hardware.So if we don't improve the capabilities of the hardware,that we cannot get a better model which is going better than GPT-4.\textcolor{red}{Therefore here is the first question that i called it S problem: If there are some solutions that we can use the same hardware and better softwares to train it, that we can get a better result.}
+\\
+
+I think the future model will be multimodal, it likes peoples' head that it can think of differents things liking listenning music, watching movies and writing texts.So it has the ability to transmit these information and tell people some expected judgment. If the model is not enough to deal with the current problems, mutiple GPUs can be used to update the muldimodal model directly, so that it can have more powerful ability to deal with more problems.
+
+
+\subsection{Parallel Computing}
+\hspace{2em}
+
+In large-scale deep learning, the computational task is huge, and it is difficult for a single GPU to accomplish such a large task, so it is necessary to take a variety of parallel computational methods to improve the computational power, usually we use data parallelism, tensor parallelism, and pipeline parallelism.
+\subsubsection{Data Parallelism}
+\hspace{2em}
+
+\textbf{Introduction:} Data parallelism is the distribution of the same model replica to multiple GPUs, each processing a different subset of the data, with the trained gradients synchronized through a communication mechanism (e.g., All-Reduce).
+
+\textbf{Applicable Scenarios:} Data volume is large, model size is moderate and a single card can hold the full model.
+
+\textbf{Advantages:} 
+    \begin{itemize}
+       
+            \item Simple and easy to implement.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Uniform data load distribution.
+        \end{itemize}
+
+\textbf{Disadvantages:} 
+\begin{itemize}
+       
+            \item Communication costs are high, especially in the gradient synchronization phase.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Model parameters cannot exceed the single card video memory limit.
+        \end{itemize}
+
+\subsubsection{Tensor Parallelism}
+\hspace{2em}
+
+\textbf{Introduction:} Tensor parallelism is to cut some tensor of the model (e.g., matrix, weights) into multiple parts and distribute them to different GPUs, each GPU is responsible for calculating a part of the tensor, and the results of the calculations are integrated through communication.
+
+\textbf{Applicable Scenarios:} The model scale is so large that a single card's video memory cannot accommodate the full model parameters.
+
+\textbf{Advantages:} 
+    \begin{itemize}
+            \item Capable of handling very large scale models.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Reduces the load on a single card's video memory.
+        \end{itemize}
+
+\textbf{Disadvantages:} 
+\begin{itemize}
+       
+            \item Tensor operations require frequent communication and high communication overhead.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Highly demanding GPU topology, often requiring high-speed interconnections (e.g., NVLink).
+        \end{itemize}
+
+\subsubsection{Pipeline Parallelism}
+\hspace{2em}
+
+\textbf{Introduction:} Pipeline parallelism splits the model into multiple stages, each assigned to a different GPU. input data is pipelined in micro-batches, with each stage processing different inputs simultaneously.
+
+\textbf{Applicable Scenarios:} Models with greater model depth and explicit layering in the computational phase (e.g., Transformer).
+
+\textbf{Advantages:} 
+    \begin{itemize}
+            \item Efficiently utilizes GPUs and reduces idle time.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Helps train deep models.
+        \end{itemize}
+
+\textbf{Disadvantages:} 
+\begin{itemize}
+       
+            \item Requires careful pipeline segmentation.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Introduces additional delays in pipeline filling (Pipeline Bubbles). Models with greater model depth and explicit layering in the computational phase (e.g., Transformer).
+        \end{itemize}
+
+ \subsubsection{3D Parallel Strategy}
+\hspace{2em}
+
+\textbf{Introduction:} The 3D parallel strategy combines data parallelism, tensor parallelism, and pipeline parallelism, and is suitable for ultra-large-scale deep learning model training. The core idea is hierarchical parallelism, which assigns different parallel tasks to different hardware architectures.
+
+\textbf{Policy Decomposition}
+\begin{enumerate}
+    \item Between GPUs within a server:tensor parallelism
+\end{enumerate}
+\begin{itemize}
+    \item Multiple GPUs within the same server work together on different tensor parts of the model through a high-speed interconnect (e.g., NVLink).
+\end{itemize}
+\begin{itemize}
+    \item Each GPU is responsible for a portion of the tensor computation, and the data is shared among GPUs.
+\end{itemize}
+\begin{enumerate}
+\setcounter{enumi}{1}
+    \item Between nodes in a compute island: pipeline parallelism
+\end{enumerate}
+\begin{itemize}
+    \item Model layering between nodes within a compute island, where each node is responsible for a certain part of the model and processes data in a pipelined fashion.
+\end{itemize}
+\begin{itemize}
+    \item Reduces inter-node communication latency.
+\end{itemize}
+
+\begin{enumerate}
+\setcounter{enumi}{2}
+    \item Between computing islands: data parallelism
+\end{enumerate}
+\begin{itemize}
+    \item Different subsets of data are processed between different compute islands, and the computation results are integrated through a global synchronization mechanism.
+\end{itemize}
+\begin{itemize}
+    \item Data parallelism avoids the communication overhead of cross-island tensors and pipelines and improves overall efficiency.
+\end{itemize}
+
+\textbf{Advantages:} 
+    \begin{itemize}
+            \item Combining the 3D parallel strategy enables efficient distributed execution for large-scale model training while balancing memory, communication, and computation resource utilization.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Applying each parallel strategy at the appropriate level minimizes communication overhead and bottlenecks to the greatest extent.
+        \end{itemize}
+
+\textbf{Challenges:} 
+    \begin{itemize}
+            \item Implementing and tuning the 3D parallel strategy is highly complex, especially for synchronization and communication across different levels.
+        \end{itemize}
+    
+    \begin{itemize}
+        
+            \item Variations in communication performance across different hardware architectures (e.g., GPUs, TPUs) may affect the strategy's effectiveness, requiring adjustments based on hardware characteristics.
+        \end{itemize}
+
+
+
+\subsection{Network Design}
+
+
+
+
+
+
+
+\end{document}
